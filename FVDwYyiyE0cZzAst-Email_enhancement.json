@@ -1,0 +1,470 @@
+{
+  "name": "Email enhancement",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        432,
+        208
+      ],
+      "id": "70cdd58f-f1e6-4629-b3ee-e910c845b4a1",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1Jl9lBfaKN8hUUplWNzG-VoiWBhGOuhxlLsGQRN8-so4",
+          "mode": "list",
+          "cachedResultName": "Email enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jl9lBfaKN8hUUplWNzG-VoiWBhGOuhxlLsGQRN8-so4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 472840700,
+          "mode": "list",
+          "cachedResultName": "Email enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jl9lBfaKN8hUUplWNzG-VoiWBhGOuhxlLsGQRN8-so4/edit#gid=472840700"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "759852bb-776d-4a91-88a1-ada836ed73de",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "prZWFZjsxjYi5TKp",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://rdap.registro.br/domain/{{ $('Normalização').item.json.dominio_limpo }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64)"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1344,
+        240
+      ],
+      "id": "46271f4f-99ba-4465-850a-6101ded76b2e",
+      "name": "HTTP Request",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        688,
+        0
+      ],
+      "id": "62686365-54d8-49a3-8a9c-2d71f5db3c49",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1712,
+        16
+      ],
+      "id": "18753583-10a1-4be3-b175-9711736696b1",
+      "name": "Wait",
+      "webhookId": "44823fc8-b12c-42bc-b5f2-83e649534941"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1248,
+        768
+      ],
+      "id": "97b1c74c-dd8c-42a9-911f-5312ccaca0ff",
+      "name": "Wait1",
+      "webhookId": "63d2cb56-4c7f-43c0-a799-95081a79cd96"
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $json.dominio_limpo }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64)"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": false,
+          "redirect": {
+            "redirect": {}
+          },
+          "timeout": 5000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        240
+      ],
+      "id": "6ec32580-eed5-432a-8516-882687609c53",
+      "name": "HTTP Request1",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "pythonNative",
+        "pythonCode": "# Pega a primeira coluna da linha (domínio)\ndominio_original = str(_item[\"json\"].get(\"dominio\", \"\"))\n\n\n#caso seja null\nif dominio_original.strip() == \"\":\n    return _item\n# Normaliza o domínio\ndominio_limpo = dominio_original.strip()\n\nfor prefixo in (\"https://\", \"http://\", \"www.\"):\n    dominio_limpo = dominio_limpo.replace(prefixo, \"\")\n\ndominio_limpo = dominio_limpo.split(\"/\")[0]\n\n\n# Adiciona os campos que você precisa\n_item[\"json\"][\"dominio_limpo\"] = dominio_limpo\n_item[\"json\"][\"emails\"] = []\n\n# Retorno obrigatório\nreturn _item\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        16
+      ],
+      "id": "fbc82640-a91a-4161-bd04-3e7278075132",
+      "name": "Normalização"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===============================\n// INPUT\n// ===============================\nconst input = $input.first().json;\nconst html = input.body || input.data || '';\n\n\n// ===============================\n// NORMALIZAÇÃO\n// ===============================\nfunction normalizeHtml(content) {\n  if (!content) return '';\n\n  const map = [\n    [/&#64;|&#x40;|&commat;|\\[at\\]|\\(at\\)|\\sat\\s/gi, '@'],\n    [/\\[dot\\]|\\(dot\\)|\\sdot\\s/gi, '.'],\n    [/&amp;/gi, '&']\n  ];\n\n  let normalized = content;\n  for (const [pattern, value] of map) {\n    normalized = normalized.replace(pattern, value);\n  }\n\n  return normalized;\n}\n\n\n// ===============================\n// EXTRAÇÃO\n// ===============================\nfunction extractEmails(content) {\n  const emails = new Set();\n\n  if (!content) return [];\n\n  // mailto\n  const mailtoRegex = /mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/gi;\n  let match;\n  while ((match = mailtoRegex.exec(content))) {\n    emails.add(match[1].toLowerCase());\n  }\n\n  // texto normal\n  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;\n  while ((match = emailRegex.exec(content))) {\n    emails.add(match[0].toLowerCase());\n  }\n\n  return [...emails];\n}\n\n\n// ===============================\nfunction filterBusinessEmails(emails, domain) {\n  const blacklist = [\n    'noreply',\n    'no-reply',\n    'support',\n    'suporte',\n    'admin',\n    'webmaster',\n    'mailer',\n    'example',\n    'test'\n  ];\n\n  const forbiddenExtensions = [\n    '.jpg', '.jpeg', '.png', '.webp', '.svg',\n    '.gif', '.mp4', '.webm', '.css', '.js',\n    '.ico', '.woff', '.woff2', '.ttf'\n  ];\n\n  return emails.filter(email => {\n    if (!email.includes('@')) return false;\n\n    // remove lixo técnico\n    if (blacklist.some(bad => email.includes(bad))) return false;\n\n    // remove imagens/arquivos\n    if (forbiddenExtensions.some(ext => email.endsWith(ext))) return false;\n\n    // garante TLD real\n    if (!hasValidTLD(email)) return false;\n\n    // garante domínio da empresa\n    if (domain && !email.includes(domain)) return false;\n\n    return true;\n  });\n}\n\nfunction hasValidTLD(email) {\n  return /\\.(com|com\\.br|br|net|org|edu|gov|io|co|info)$/i.test(email);\n}\n\n\n\n// ===============================\n// EXECUÇÃO\n// ===============================\nconst normalizedHtml = normalizeHtml(html);\nconst rawEmails = extractEmails(normalizedHtml);\nconst finalEmails = filterBusinessEmails(rawEmails);\n\n\n// ===============================\n// OUTPUT\n// ===============================\nreturn {\n  json: {\n    emails: finalEmails,     // <-- LISTA\n     fontes: finalEmails.length > 0 ? 'scraper' : 'Não encontrado',\n    totalFound: finalEmails.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        240
+      ],
+      "id": "0bbf03ac-6601-4dc2-a0ec-43934e9c75ec",
+      "name": "Scrapper1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        848,
+        512
+      ],
+      "id": "d95af1fe-39f7-4ba6-a538-55f99e0cddea",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "pythonNative",
+        "pythonCode": "# Garante lista base de emails\nif \"emails\" not in _item[\"json\"] or not isinstance(_item[\"json\"][\"emails\"], list):\n    _item[\"json\"][\"emails\"] = []\n\n# Garante lista de fontes\nif \"fontes\" not in _item[\"json\"] or not isinstance(_item[\"json\"][\"fontes\"], list):\n    _item[\"json\"][\"fontes\"] = []\n\nemails = _item[\"json\"][\"emails\"]\nfontes = _item[\"json\"][\"fontes\"]\n\n# RDAP body seguro\nbody = _item[\"json\"].get(\"body\", {})\nentities = body.get(\"entities\", [])\n\nfound_any = False\n\n# Extrai emails do RDAP\nif isinstance(entities, list):\n    for entity in entities:\n        vcard = entity.get(\"vcardArray\", [])\n        if len(vcard) < 2:\n            continue\n\n        for field in vcard[1]:\n            if len(field) >= 4 and field[0] == \"email\":\n                email = field[3]\n                if email and email not in emails:\n                    emails.append(email)\n                    found_any = True\n\n# Marca fonte apenas se achou algo\nif found_any and \"rdap\" not in fontes:\n    fontes.append(\"rdap\")\n\n# Atualiza json\n_item[\"json\"][\"emails\"] = emails\n_item[\"json\"][\"fontes\"] = fontes\n_item[\"json\"][\"totalFound\"] = len(emails)\n\nreturn _item"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        480
+      ],
+      "id": "3ba3cdf7-3d9d-451e-8fc8-39f2e0412e71",
+      "name": "RDAP_Protocol1"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1Jl9lBfaKN8hUUplWNzG-VoiWBhGOuhxlLsGQRN8-so4",
+          "mode": "list",
+          "cachedResultName": "Email enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jl9lBfaKN8hUUplWNzG-VoiWBhGOuhxlLsGQRN8-so4/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 472840700,
+          "mode": "list",
+          "cachedResultName": "Email enrichment",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Jl9lBfaKN8hUUplWNzG-VoiWBhGOuhxlLsGQRN8-so4/edit#gid=472840700"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "dominio": "={{ $('Normalização').first(0).json.dominio }}",
+            "email": "={{ $json.emails }}",
+            "font": "={{ $json.fontes }}"
+          },
+          "matchingColumns": [
+            "dominio"
+          ],
+          "schema": [
+            {
+              "id": "dominio",
+              "displayName": "dominio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dominio_limpo",
+              "displayName": "dominio_limpo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "font",
+              "displayName": "font",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1072,
+        768
+      ],
+      "id": "91ef144a-adf7-4c67-9f6c-7d1e48bc049e",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "prZWFZjsxjYi5TKp",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const itens = $input.all();\n\nconst emailSet = new Set();\nconst fonteSet = new Set();\n\nfor (const item of itens) {\n  // ---- EMAILS ----\n  let emails = item.json.emails;\n\n  if (typeof emails === 'string') {\n    emails = emails.split('\\n');\n  }\n\n  if (Array.isArray(emails)) {\n    for (let email of emails) {\n      if (!email) continue;\n      emailSet.add(email.trim().toLowerCase());\n    }\n  }\n\n  // ---- FONTES ----\n  let fonte = item.json.fonte || item.json.fontes;\n  if (fonte) {\n    fonteSet.add(fonte);\n  }\n}\n\nreturn [{\n  json: {\n    emails: [...emailSet].join('\\n'),\n    fontes: [...fonteSet].join(' + ')\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        768
+      ],
+      "id": "6416d710-86cb-4fe0-991c-005ab6ebe51c",
+      "name": "Finalizer"
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "RDAP_Protocol1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Normalização",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Scrapper1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalização": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrapper1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Finalizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RDAP_Protocol1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalizer": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
