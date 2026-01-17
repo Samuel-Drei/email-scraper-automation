@@ -1,0 +1,329 @@
+{
+  "name": "Extração de Emails de Sites",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        -48
+      ],
+      "id": "5431abcb-94ef-41a1-ac7f-85aa85eddc07",
+      "name": "Iniciar"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1aUpe48N3DIquswEgTJt2QuT_6oCSCWfREuWxXM9XKSU",
+          "mode": "list",
+          "cachedResultName": "Cópia de Scrape N8N do Registro BR",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aUpe48N3DIquswEgTJt2QuT_6oCSCWfREuWxXM9XKSU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Página1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aUpe48N3DIquswEgTJt2QuT_6oCSCWfREuWxXM9XKSU/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -816,
+        -48
+      ],
+      "id": "94b26443-0d81-4eba-a48f-266b49692881",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VdKXNQmGUqFWYfvR",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -592,
+        -48
+      ],
+      "id": "895a1da4-e842-4a24-a0b6-a26ac897614a",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        544,
+        -64
+      ],
+      "id": "43bc1e7e-5b21-47d8-b8c0-f1588dec90d7"
+    },
+    {
+      "parameters": {
+        "amount": 2
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -192,
+        -144
+      ],
+      "id": "497a5107-107a-4134-9aaa-b7b34a2e5497",
+      "name": "Wait",
+      "webhookId": "e2133878-9d92-4651-a034-03ae94ca772e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o HTML do HTTP Request\nconst httpData = $input.first().json;\nconst html = httpData.body || httpData.data || JSON.stringify(httpData);\nconst siteUrl = httpData.Site || $input.first().json.Site || '';\n\nconsole.log('=== BUSCA AVANÇADA POR EMAIL ===');\nconsole.log('Site:', siteUrl);\nconsole.log('HTML size:', html.length);\n\n// Função super robusta para encontrar emails\nfunction extractEmailsAdvanced(content) {\n  let emails = [];\n  \n  // 1. Decodifica entidades HTML primeiro\n  const decodedContent = content\n    .replace(/&#64;/g, '@')           // &#64; = @\n    .replace(/&amp;/g, '&')          // &amp; = &\n    .replace(/&lt;/g, '<')           // &lt; = \n    .replace(/&gt;/g, '>')           // &gt; = >\n    .replace(/&#x40;/g, '@')         // &#x40; = @\n    .replace(/&#0064;/g, '@')        // &#0064; = @\n    .replace(/&commat;/g, '@')       // &commat; = @\n    .replace(/\\[at\\]/gi, '@')        // [at] = @\n    .replace(/\\(at\\)/gi, '@')        // (at) = @\n    .replace(/\\sat\\s/gi, '@')        // \" at \" = @\n    .replace(/\\[dot\\]/gi, '.')       // [dot] = .\n    .replace(/\\(dot\\)/gi, '.')       // (dot) = .\n    .replace(/\\sdot\\s/gi, '.');      // \" dot \" = .\n  \n  // 2. Patterns mais agressivos\n  const patterns = [\n    // Email normal\n    /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/g,\n    // Email em atributos\n    /href\\s*=\\s*[\"']mailto:([^\"']+)[\"']/gi,\n    // Email em data attributes\n    /data-email\\s*=\\s*[\"']([^\"']+)[\"']/gi,\n    // Email ofuscado com spans\n    /<span[^>]*>([a-zA-Z0-9._%+-]+)<\\/span>\\s*@\\s*<span[^>]*>([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})<\\/span>/gi,\n    // Email separado por elementos\n    /([a-zA-Z0-9._%+-]+)\\s*<[^>]*>\\s*@\\s*<[^>]*>\\s*([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/gi,\n    // Email com espaços extras\n    /([a-zA-Z0-9._%+-]+)\\s+@\\s+([a-zA-Z0-9.-]+\\s*\\.\\s*[a-zA-Z]{2,})/g,\n    // Email em JavaScript\n    /[\"']([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})[\"']/g,\n    // Email base64 (básico)\n    /btoa\\s*\\(\\s*[\"']([^\"']*@[^\"']*)[\"']\\s*\\)/gi\n  ];\n  \n  // 3. Aplica cada pattern\n  patterns.forEach((pattern, index) => {\n    const matches = decodedContent.match(pattern) || [];\n    console.log(`Pattern ${index + 1}: encontrou ${matches.length} matches`);\n    \n    matches.forEach(match => {\n      // Limpa o match dependendo do pattern\n      let cleanEmail = match;\n      \n      if (match.includes('mailto:')) {\n        cleanEmail = match.replace(/.*mailto:/, '').replace(/[\"']/g, '');\n      } else if (match.includes('data-email')) {\n        cleanEmail = match.replace(/.*data-email\\s*=\\s*[\"']/, '').replace(/[\"'].*/, '');\n      } else if (match.includes('<span')) {\n        // Para emails ofuscados com spans\n        const parts = match.match(/([a-zA-Z0-9._%+-]+)[^a-zA-Z0-9]*@[^a-zA-Z0-9]*([a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/);\n        if (parts) cleanEmail = parts[1] + '@' + parts[2];\n      } else if (match.includes('\"') || match.includes(\"'\")) {\n        cleanEmail = match.replace(/['\"]/g, '');\n      }\n      \n      // Remove espaços extras\n      cleanEmail = cleanEmail.replace(/\\s+/g, '');\n      \n      if (cleanEmail.includes('@') && cleanEmail.includes('.')) {\n        emails.push(cleanEmail);\n      }\n    });\n  });\n  \n  // 4. Busca em scripts e dados JSON\n  const scriptMatches = content.match(/<script[^>]*>(.*?)<\\/script>/gs) || [];\n  scriptMatches.forEach(script => {\n    const scriptEmails = script.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g) || [];\n    emails = emails.concat(scriptEmails);\n  });\n  \n  // 5. Busca em comentários HTML\n  const commentMatches = content.match(/<!--(.*?)-->/gs) || [];\n  commentMatches.forEach(comment => {\n    const commentEmails = comment.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g) || [];\n    emails = emails.concat(commentEmails);\n  });\n  \n  // 6. Filtra e limpa emails finais\n  const validEmails = [...new Set(emails)]\n    .map(email => email.toLowerCase().trim())\n    .filter(email => {\n      return email.includes('@') && \n             email.includes('.') &&\n             !email.includes('noreply') &&\n             !email.includes('no-reply') &&\n             !email.includes('example') &&\n             !email.includes('test') &&\n             !email.includes('domain.com') &&\n             !email.includes('email.com') &&\n             !email.includes(' ') &&\n             email.length > 5 &&\n             email.length < 100 &&\n             /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$/.test(email);\n    });\n  \n  console.log('Emails válidos encontrados:', validEmails);\n  return validEmails;\n}\n\n// Executa a busca\nconst foundEmails = extractEmailsAdvanced(html);\n\n// Se não encontrou, tenta buscar padrões específicos do site\nif (foundEmails.length === 0) {\n  console.log('Tentando padrões específicos...');\n  \n  // Busca por WhatsApp que pode ter email associado\n  const whatsappPattern = /whatsapp.*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/gi;\n  const whatsappEmails = html.match(whatsappPattern) || [];\n  \n  // Busca por \"contato\" próximo a emails\n  const contactPattern = /contato.*?([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/gi;\n  const contactEmails = html.match(contactPattern) || [];\n  \n  foundEmails.push(...whatsappEmails, ...contactEmails);\n}\n\nreturn {\n  json: {\n    email: foundEmails.length > 0 ? foundEmails[0] : 'Email não encontrado',\n    range: `B${$runIndex + 2}`,\n    site: siteUrl,\n    allEmails: foundEmails,\n    totalFound: foundEmails.length,\n    debug: {\n      htmlSize: html.length,\n      hasAt: html.includes('@'),\n      hasMailto: html.includes('mailto'),\n      hasContact: html.toLowerCase().includes('contato')\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -336
+      ],
+      "id": "a271b4e6-d6eb-49d1-8195-efd5feb709fb",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $json.Sites }}",
+        "options": {
+          "timeout": 3000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -368,
+        -144
+      ],
+      "id": "28331e41-a77c-4f10-89af-4d244f98789a",
+      "name": "HTTP Request1",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1aUpe48N3DIquswEgTJt2QuT_6oCSCWfREuWxXM9XKSU",
+          "mode": "list",
+          "cachedResultName": "Cópia de Scrape N8N do Registro BR",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aUpe48N3DIquswEgTJt2QuT_6oCSCWfREuWxXM9XKSU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Página1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aUpe48N3DIquswEgTJt2QuT_6oCSCWfREuWxXM9XKSU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Emails": "={{ $json.emails_str }}",
+            "Sites": "={{ $('Get row(s) in sheet').item.json.Sites }}"
+          },
+          "matchingColumns": [
+            "Sites"
+          ],
+          "schema": [
+            {
+              "id": "Sites",
+              "displayName": "Sites",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Emails",
+              "displayName": "Emails",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        176,
+        -144
+      ],
+      "id": "2f35e523-ae99-406d-8ba4-2982015b8a7c",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "VdKXNQmGUqFWYfvR",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        352,
+        -144
+      ],
+      "id": "21c392a3-a214-4b03-b31c-f4933f6264ff",
+      "name": "Wait1",
+      "webhookId": "9a0f1b2c-7d3a-4635-bd6e-188a601e1b06"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ===============================\n// INPUT\n// ===============================\nconst input = $input.first().json;\nconst html = input.body || input.data || '';\nconst site = input.site || input.Site || '';\n\n\n// ===============================\n// NORMALIZAÇÃO\n// ===============================\nfunction normalizeHtml(content) {\n  if (!content) return '';\n\n  const map = [\n    [/&#64;|&#x40;|&commat;|\\[at\\]|\\(at\\)|\\sat\\s/gi, '@'],\n    [/\\[dot\\]|\\(dot\\)|\\sdot\\s/gi, '.'],\n    [/&amp;/gi, '&']\n  ];\n\n  let normalized = content;\n  for (const [pattern, value] of map) {\n    normalized = normalized.replace(pattern, value);\n  }\n\n  return normalized;\n}\n\n\n// ===============================\n// EXTRAÇÃO\n// ===============================\nfunction extractEmails(content) {\n  const emails = new Set();\n\n  if (!content) return [];\n\n  // mailto\n  const mailtoRegex = /mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})/gi;\n  let match;\n  while ((match = mailtoRegex.exec(content))) {\n    emails.add(match[1].toLowerCase());\n  }\n\n  // texto normal\n  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}/g;\n  while ((match = emailRegex.exec(content))) {\n    emails.add(match[0].toLowerCase());\n  }\n\n  return [...emails];\n}\n\n\n// ===============================\nfunction filterBusinessEmails(emails, domain) {\n  const blacklist = [\n    'noreply',\n    'no-reply',\n    'support',\n    'suporte',\n    'admin',\n    'webmaster',\n    'mailer',\n    'example',\n    'test'\n  ];\n\n  const forbiddenExtensions = [\n    '.jpg', '.jpeg', '.png', '.webp', '.svg',\n    '.gif', '.mp4', '.webm', '.css', '.js',\n    '.ico', '.woff', '.woff2', '.ttf'\n  ];\n\n  return emails.filter(email => {\n    if (!email.includes('@')) return false;\n\n    // remove lixo técnico\n    if (blacklist.some(bad => email.includes(bad))) return false;\n\n    // remove imagens/arquivos\n    if (forbiddenExtensions.some(ext => email.endsWith(ext))) return false;\n\n    // garante TLD real\n    if (!hasValidTLD(email)) return false;\n\n    // garante domínio da empresa\n    if (domain && !email.includes(domain)) return false;\n\n    return true;\n  });\n}\n\nfunction hasValidTLD(email) {\n  return /\\.(com|com\\.br|br|net|org|edu|gov|io|co|info)$/i.test(email);\n}\n\n\n\n// ===============================\n// EXECUÇÃO\n// ===============================\nconst normalizedHtml = normalizeHtml(html);\nconst rawEmails = extractEmails(normalizedHtml);\n\n// extrai domínio do site\nconst domain = site.replace(/^https?:\\/\\//, '').replace('www.', '').split('/')[0];\n\nconst finalEmails = filterBusinessEmails(rawEmails, domain);\n\n\n// ===============================\n// OUTPUT\n// ===============================\nreturn {\n  json: {\n    emails: finalEmails,\n    emails_str: finalEmails.join('\\n'),\n    fonte: 'scraper',\n    totalFound: finalEmails.length,\n    site\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -144
+      ],
+      "id": "7c374a07-c5bf-4ca3-8ed7-cbbc5f7a26a7",
+      "name": "Scrapper"
+    }
+  ],
+  "connections": {
+    "Iniciar": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Scrapper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        []
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrapper": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "pinData": {},
+  "triggerCount": 0,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
