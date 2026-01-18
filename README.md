@@ -5,6 +5,7 @@ Automation built with n8n to collect, normalize and deduplicate public emails fr
 ## What this project does
 - Scrapes public emails from websites (HTML + RDAP)
 - Merges multiple data sources
+  
 - Normalizes and removes duplicates
 - Stores data in Google Sheets
 - Sends emails in controlled batches
