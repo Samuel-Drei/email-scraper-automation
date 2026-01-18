@@ -1,0 +1,22 @@
+# Pega a primeira coluna da linha (domínio)
+dominio_original = str(_item["json"].get("dominio", ""))
+
+
+#caso seja null
+if dominio_original.strip() == "":
+    return _item
+# Normaliza o domínio
+dominio_limpo = dominio_original.strip()
+
+for prefixo in ("https://", "http://", "www."):
+    dominio_limpo = dominio_limpo.replace(prefixo, "")
+
+dominio_limpo = dominio_limpo.split("/")[0]
+
+
+# Adiciona os campos que você precisa
+_item["json"]["dominio_limpo"] = dominio_limpo
+_item["json"]["emails"] = []
+
+# Retorno obrigatório
+return _item
