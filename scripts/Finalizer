@@ -1,0 +1,33 @@
+const itens = $input.all();
+
+const emailSet = new Set();
+const fonteSet = new Set();
+
+for (const item of itens) {
+  // ---- EMAILS ----
+  let emails = item.json.emails;
+
+  if (typeof emails === 'string') {
+    emails = emails.split('\n');
+  }
+
+  if (Array.isArray(emails)) {
+    for (let email of emails) {
+      if (!email) continue;
+      emailSet.add(email.trim().toLowerCase());
+    }
+  }
+
+  // ---- FONTES ----
+  let fonte = item.json.fonte || item.json.fontes;
+  if (fonte) {
+    fonteSet.add(fonte);
+  }
+}
+
+return [{
+  json: {
+    emails: [...emailSet].join('\n'),
+    fontes: [...fonteSet].join(' + ')
+  }
+}];
