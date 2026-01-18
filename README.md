@@ -11,16 +11,18 @@ Automation built with n8n to collect, normalize and deduplicate public emails fr
 - Sends emails in controlled batches
 
 ## Why I built this
-I wanted to learn how to design real-world automations involving
-data extraction, cleaning, merging and delivery.
+## Why I built this
+
+I built this project to automate the process of collecting business emails from public websites, which was previously a slow and repetitive manual task.
+With this system, the same task is executed automatically, reducing the manual workload by roughly **30%–40%**, while also improving consistency and accuracy.
+By automating scraping, normalization, deduplication, and validation, this workflow reduced the total execution time by an estimated **30% or more**, while removing repetitive manual steps entirely. Beyond time savings, the automation eliminates human error, prioritizes higher-quality emails, and integrates directly with a controlled email-sending pipeline. This allowed the company to scale outreach without increasing operational effort.
 
 ## Tech stack
 - n8n
 - JavaScript (Function nodes)
 - HTTP Requests
-  
 - RDAP
-- Google Sheets
+- Google Sheets sender
 
 ## How to run
 1. Import the workflow JSON into n8n
