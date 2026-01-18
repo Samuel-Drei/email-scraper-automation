@@ -1,0 +1,116 @@
+// ===============================
+// INPUT
+// ===============================
+const input = $input.first().json;
+const html = input.body || input.data || '';
+
+
+// ===============================
+// NORMALIZAÇÃO
+// ===============================
+function normalizeHtml(content) {
+  if (!content) return '';
+
+  const map = [
+    [/&#64;|&#x40;|&commat;|\[at\]|\(at\)|\sat\s/gi, '@'],
+    [/\[dot\]|\(dot\)|\sdot\s/gi, '.'],
+    [/&amp;/gi, '&']
+  ];
+
+  let normalized = content;
+  for (const [pattern, value] of map) {
+    normalized = normalized.replace(pattern, value);
+  }
+
+  return normalized;
+}
+
+
+// ===============================
+// EXTRAÇÃO
+// ===============================
+function extractEmails(content) {
+  const emails = new Set();
+
+  if (!content) return [];
+
+  // mailto
+  const mailtoRegex = /mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi;
+  let match;
+  while ((match = mailtoRegex.exec(content))) {
+    emails.add(match[1].toLowerCase());
+  }
+
+  // texto normal
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  while ((match = emailRegex.exec(content))) {
+    emails.add(match[0].toLowerCase());
+  }
+
+  return [...emails];
+}
+
+
+// ===============================
+function filterBusinessEmails(emails, domain) {
+  const blacklist = [
+    'noreply',
+    'no-reply',
+    'support',
+    'suporte',
+    'admin',
+    'webmaster',
+    'mailer',
+    'example',
+    'test'
+  ];
+
+  const forbiddenExtensions = [
+    '.jpg', '.jpeg', '.png', '.webp', '.svg',
+    '.gif', '.mp4', '.webm', '.css', '.js',
+    '.ico', '.woff', '.woff2', '.ttf'
+  ];
+
+  return emails.filter(email => {
+    if (!email.includes('@')) return false;
+
+    // remove lixo técnico
+    if (blacklist.some(bad => email.includes(bad))) return false;
+
+    // remove imagens/arquivos
+    if (forbiddenExtensions.some(ext => email.endsWith(ext))) return false;
+
+    // garante TLD real
+    if (!hasValidTLD(email)) return false;
+
+    // garante domínio da empresa
+    if (domain && !email.includes(domain)) return false;
+
+    return true;
+  });
+}
+
+function hasValidTLD(email) {
+  return /\.(com|com\.br|br|net|org|edu|gov|io|co|info)$/i.test(email);
+}
+
+
+
+// ===============================
+// EXECUÇÃO
+// ===============================
+const normalizedHtml = normalizeHtml(html);
+const rawEmails = extractEmails(normalizedHtml);
+const finalEmails = filterBusinessEmails(rawEmails);
+
+
+// ===============================
+// OUTPUT
+// ===============================
+return {
+  json: {
+    emails: finalEmails,     // <-- LISTA
+     fontes: finalEmails.length > 0 ? 'scraper' : 'Não encontrado',
+    totalFound: finalEmails.length
+  }
+};
