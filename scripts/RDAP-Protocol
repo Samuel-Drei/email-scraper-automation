@@ -1,0 +1,41 @@
+# Garante lista base de emails
+if "emails" not in _item["json"] or not isinstance(_item["json"]["emails"], list):
+    _item["json"]["emails"] = []
+
+# Garante lista de fontes
+if "fontes" not in _item["json"] or not isinstance(_item["json"]["fontes"], list):
+    _item["json"]["fontes"] = []
+
+emails = _item["json"]["emails"]
+fontes = _item["json"]["fontes"]
+
+# RDAP body seguro
+body = _item["json"].get("body", {})
+entities = body.get("entities", [])
+
+found_any = False
+
+# Extrai emails do RDAP
+if isinstance(entities, list):
+    for entity in entities:
+        vcard = entity.get("vcardArray", [])
+        if len(vcard) < 2:
+            continue
+
+        for field in vcard[1]:
+            if len(field) >= 4 and field[0] == "email":
+                email = field[3]
+                if email and email not in emails:
+                    emails.append(email)
+                    found_any = True
+
+# Marca fonte apenas se achou algo
+if found_any and "rdap" not in fontes:
+    fontes.append("rdap")
+
+# Atualiza json
+_item["json"]["emails"] = emails
+_item["json"]["fontes"] = fontes
+_item["json"]["totalFound"] = len(emails)
+
+return _item
