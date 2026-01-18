@@ -11,7 +11,6 @@ Automation built with n8n to collect, normalize and deduplicate public emails fr
 - Sends emails in controlled batches
 
 ## Why I built this
-## Why I built this
 
 I built this project to automate the process of collecting business emails from public websites, which was previously a slow and repetitive manual task.
 With this system, the same task is executed automatically, reducing the manual workload by roughly **30%–40%**, while also improving consistency and accuracy.
