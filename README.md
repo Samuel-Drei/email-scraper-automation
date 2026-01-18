@@ -18,9 +18,9 @@ Beyond time savings, the automation eliminates human error, prioritizes higher-q
 
 ## Tech stack
 - n8n
-- JavaScript (Function nodes)
+- JavaScript and Python (Function nodes)
 - HTTP Requests
-- RDAP
+- RDAP (Registration Data Access Protocol)
 - Google Sheets sender
 
 ## How to run
