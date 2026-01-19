@@ -1,0 +1,326 @@
+/**
+ * @OnlyCurrentDoc
+ * Mail Merge Otimizado – Suporte a múltiplos emails por célula e controle estrito de lote.
+ */
+
+/** ===================== CONFIG ===================== **/
+const RECIPIENT_COL    = "Email";
+const EMAIL_SENT_COL   = "Email Sent";
+const DRAFT_SUBJECT    = "Por que alguns anúncios imobiliários performam mais";
+
+// Configurações de Lote
+const BATCH_SIZE       = 95;   // Limite exato de envios por execução
+const INTERVAL_MINUTES = 1450; // Intervalo até a próxima execução (~24h)
+const TIMEZONE         = 'America/Sao_Paulo';
+const SENDER_NAME      = 'Ibrand Agency';
+
+/** ===================== MENU ===================== **/
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('📧 Automação Pro')
+    .addItem('🚀 Iniciar Automação', 'startAutomation')
+    .addItem('🛑 Pausar Automação', 'stopAutomation')
+    .addItem('📊 Status Detalhado', 'showStatus')
+    .addToUi();
+}
+
+/** ===================== CONTROLE ===================== **/
+function startAutomation() {
+  try {
+    // Limpa triggers antigos para evitar duplicidade
+    stopAutomation(true); 
+
+    const props = PropertiesService.getScriptProperties();
+    props.setProperties({
+      'AUTO_ACTIVE': 'true',
+      'TOTAL_SENT': '0',
+      'INTERVAL_MINUTES': String(INTERVAL_MINUTES),
+      'BATCH_SIZE': String(BATCH_SIZE),
+      'NEXT_RUN': '',
+      'LAST_EXECUTION': ''
+    });
+
+    // Executa o primeiro lote
+    runAutomation_();
+    SpreadsheetApp.getUi().alert('Automação iniciada com sucesso.');
+  } catch (err) {
+    SpreadsheetApp.getUi().alert('Erro ao iniciar: ' + err.message);
+  }
+}
+
+function stopAutomation(silent = false) {
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('AUTO_ACTIVE', 'false');
+
+  if (!silent) {
+    const total = props.getProperty('TOTAL_SENT') || '0';
+    SpreadsheetApp.getUi().alert(`Automação pausada.\nTotal enviado nesta sessão: ${total}`);
+  }
+}
+
+function showStatus() {
+  const p = PropertiesService.getScriptProperties();
+  const isActive = p.getProperty('AUTO_ACTIVE') === 'true';
+  const total = p.getProperty('TOTAL_SENT') || '0';
+  const last = p.getProperty('LAST_EXECUTION');
+  const next = p.getProperty('NEXT_RUN');
+
+  const ui = SpreadsheetApp.getUi();
+  ui.alert(
+    `STATUS DA AUTOMAÇÃO\n` +
+    `-------------------\n` +
+    `Estado: ${isActive ? '🟢 RODANDO' : '🔴 PARADO'}\n` +
+    `Enviados (sessão atual): ${total}\n` +
+    `Último envio: ${last ? Utilities.formatDate(new Date(last), TIMEZONE, 'dd/MM HH:mm') : '—'}\n` +
+    `Próxima execução: ${next ? Utilities.formatDate(new Date(next), TIMEZONE, 'dd/MM HH:mm') : '—'}`
+  );
+}
+
+/** ===================== CORE AUTOMATION ===================== **/
+function runAutomation_() {
+  const lock = LockService.getScriptLock();
+  // Tenta bloquear por 30s para evitar execuções simultâneas
+  if (!lock.tryLock(30000)) return;
+
+  const props = PropertiesService.getScriptProperties();
+  
+  try {
+    if (props.getProperty('AUTO_ACTIVE') !== 'true') return;
+
+    const limit = Number(props.getProperty('BATCH_SIZE'));
+    
+    // === EXECUTA O ENVIO DO LOTE ===
+    const result = processBatch_(limit);
+    // ===============================
+
+    // Atualiza contadores
+    const currentTotal = Number(props.getProperty('TOTAL_SENT') || '0');
+    const newTotal = currentTotal + result.sentCount;
+    
+    props.setProperty('TOTAL_SENT', String(newTotal));
+    props.setProperty('LAST_EXECUTION', new Date().toISOString());
+
+    // Lógica de agendamento
+    if (result.hasMore) {
+      // Se ainda tem gente na lista (hasMore = true), agenda o próximo
+      const nextRun = new Date(Date.now() + (Number(props.getProperty('INTERVAL_MINUTES')) * 60 * 1000));
+      scheduleTrigger_('runAutomation_', nextRun);
+      props.setProperty('NEXT_RUN', nextRun.toISOString());
+
+      logEmail_(`Relatório de Lote (${result.sentCount} enviados)`, 
+        `Lote finalizado.\nEnviados agora: ${result.sentCount}\nTotal acumulado: ${newTotal}\nPróximo envio: ${nextRun}`);
+    } else {
+      // Se acabou a lista
+      stopAutomation(true); 
+      props.deleteProperty('NEXT_RUN');
+      logEmail_('Automação Finalizada', `Todos os e-mails da planilha foram processados.\nTotal enviado: ${newTotal}`);
+    }
+
+  } catch (error) {
+    console.error(error);
+    stopAutomation(true); // Pausa em caso de erro crítico
+    logEmail_('ERRO CRÍTICO - Automação Pausada', `Erro: ${error.message}\nStack: ${error.stack}`);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** * Processa a planilha linha a linha, e e-mail a e-mail dentro da célula.
+ * Retorna { sentCount: number, hasMore: boolean }
+ */
+function processBatch_(batchLimit) {
+  const sheet = SpreadsheetApp.getActiveSheet();
+  // Pega todos os dados como String para preservar formatação
+  const range = sheet.getDataRange();
+  const data = range.getDisplayValues();
+  const headers = data.shift(); // Remove cabeçalho
+
+  const recipientIdx = headers.indexOf(RECIPIENT_COL);
+  const statusIdx = headers.indexOf(EMAIL_SENT_COL);
+
+  if (recipientIdx === -1 || statusIdx === -1) {
+    throw new Error(`Colunas não encontradas: "${RECIPIENT_COL}" ou "${EMAIL_SENT_COL}"`);
+  }
+
+  // Carrega o rascunho apenas uma vez
+  const template = getGmailTemplate_(DRAFT_SUBJECT);
+  
+  let sentInThisBatch = 0;
+  let hasMoreRecipients = false;
+
+  // Loop pelas linhas
+  for (let r = 0; r < data.length; r++) {
+    const row = data[r];
+    const rawEmails = row[recipientIdx];
+    const currentStatus = row[statusIdx]; // O que já foi escrito na coluna de status
+
+    // Se não tem email, pula
+    if (!rawEmails) continue;
+
+    // 1. Extrai lista limpa de e-mails da célula (separa por quebra de linha, vírgula ou ponto e vírgula)
+    const targets = rawEmails.split(/[\n\r,;]+/)
+                             .map(e => e.trim())
+                             .filter(e => e !== '' && e.includes('@'));
+
+    // 2. Verifica quais já foram enviados olhando a coluna de Status
+    // A coluna status agora vai armazenar: "email1@teste.com (Data), email2@teste.com (Data)"
+    const alreadySentList = currentStatus ? currentStatus.toLowerCase() : "";
+    
+    // Filtra apenas os pendentes
+    const pending = targets.filter(email => !alreadySentList.includes(email.toLowerCase()));
+
+    if (pending.length === 0) {
+      continue; // Linha totalmente processada
+    }
+
+    // Se chegamos aqui, tem e-mail pendente nesta linha.
+    // Agora processamos os pendentes ATÉ bater o limite do lote.
+    
+    let emailsSentForThisRow = [];
+    let rowError = null;
+
+    for (const email of pending) {
+      // CHECK DE LIMITE
+      if (sentInThisBatch >= batchLimit) {
+        hasMoreRecipients = true;
+        break; // Sai do loop de emails, mas vai cair no return lá embaixo
+      }
+
+      try {
+        // Prepara mensagem personalizada
+        const msg = fillTemplate_(template.message, row, headers);
+        
+        GmailApp.sendEmail(email, msg.subject, msg.text, {
+          htmlBody: msg.html,
+          name: SENDER_NAME,
+          attachments: template.attachments,
+          inlineImages: template.inlineImages
+        });
+
+        // Adiciona ao log temporário da linha
+        const timestamp = Utilities.formatDate(new Date(), TIMEZONE, "dd/MM HH:mm");
+        emailsSentForThisRow.push(`${email} (${timestamp})`);
+        
+        sentInThisBatch++;
+        
+        // Pausa anti-spam do Google (importante)
+        Utilities.sleep(800); 
+
+      } catch (e) {
+        rowError = `Erro em ${email}: ${e.message}`;
+        console.error(rowError);
+      }
+    }
+
+    // === ATUALIZA A PLANILHA ===
+    // Só escreve na planilha se enviamos algo ou deu erro
+    if (emailsSentForThisRow.length > 0 || rowError) {
+      const existingText = currentStatus ? currentStatus + "\n" : "";
+      const newLogText = existingText + emailsSentForThisRow.join("\n") + (rowError ? "\n" + rowError : "");
+      
+      // Atualiza a célula exata (r + 2 pois r começa em 0 e header ocupa 1)
+      sheet.getRange(r + 2, statusIdx + 1).setValue(newLogText);
+    }
+
+    // Se paramos o loop interno porque bateu o limite, paramos o loop externo também
+    if (sentInThisBatch >= batchLimit) {
+      // Verificamos se ainda sobraram e-mails nessa mesma linha ou nas próximas
+      if (pending.length > emailsSentForThisRow.length) hasMoreRecipients = true;
+      // Precisamos checar se existem linhas ABAIXO desta que ainda têm pendências
+      else if (checkIfMoreRowsExist_(data, r + 1, recipientIdx, statusIdx)) hasMoreRecipients = true;
+      
+      break; 
+    }
+  }
+
+  // Verificação final se não bateu o limite mas acabou o loop (para garantir que hasMore esteja certo)
+  if (sentInThisBatch < batchLimit) {
+    // Se processou tudo e não bateu o limite, hasMore continua false, a menos que tenha sido setado antes
+  }
+
+  return { sentCount: sentInThisBatch, hasMore: hasMoreRecipients };
+}
+
+// Helper rápido para ver se tem mais gente nas linhas de baixo (otimização)
+function checkIfMoreRowsExist_(rows, startIndex, recIdx, statIdx) {
+  for (let i = startIndex; i < rows.length; i++) {
+    const raw = rows[i][recIdx];
+    const stat = rows[i][statIdx];
+    if (raw && (!stat || stat.length < raw.length)) return true; // Lógica simplificada
+  }
+  return false;
+}
+
+/** ===================== TEMPLATE ENGINE ===================== **/
+function getGmailTemplate_(subject) {
+  const draft = GmailApp.getDrafts().find(d => d.getMessage().getSubject() === subject);
+  if (!draft) throw new Error(`Rascunho não encontrado com assunto: "${subject}"`);
+
+  const msg = draft.getMessage();
+  const body = msg.getBody();
+  
+  // Tratamento de Imagens Inline
+  const attachments = msg.getAttachments({includeInlineImages: false});
+  const inlineAttachments = msg.getAttachments({includeInlineImages: true, includeAttachments: false});
+  const inlineImages = {};
+  
+  if (inlineAttachments.length > 0) {
+    const byName = {};
+    inlineAttachments.forEach(a => byName[a.getName()] = a);
+    
+    // Regex para achar CIDs
+    const regex = /src="cid:(.*?)"/g;
+    let match;
+    while ((match = regex.exec(body)) !== null) {
+      const cid = match[1];
+      // Tenta achar imagem pelo nome ou ID, Gmail é chato com isso
+      const img = inlineAttachments.find(a => a.getName() === cid) || inlineAttachments[0]; 
+      if (img) inlineImages[cid] = img;
+    }
+  }
+
+  return { 
+    message: { subject: subject, text: msg.getPlainBody(), html: body }, 
+    attachments: attachments, 
+    inlineImages: inlineImages 
+  };
+}
+
+function fillTemplate_(templateObj, rowData, headers) {
+  let html = templateObj.html;
+  let text = templateObj.text;
+  let subj = templateObj.subject;
+
+  // Cria mapa de chave:valor da linha atual
+  const map = {};
+  headers.forEach((h, i) => map[h] = rowData[i]);
+
+  // Função de replace segura
+  const replaceVars = (str) => {
+    return str.replace(/{{(.*?)}}/g, (match, key) => {
+      const cleanKey = key.trim();
+      return map[cleanKey] != null ? map[cleanKey] : ""; 
+    });
+  };
+
+  return {
+    html: replaceVars(html),
+    text: replaceVars(text),
+    subject: replaceVars(subj)
+  };
+}
+
+/** ===================== UTILIDADES ===================== **/
+function scheduleTrigger_(funcName, dateObj) {
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger(funcName).timeBased().at(dateObj).create();
+}
+
+function logEmail_(subject, body) {
+  try {
+    GmailApp.sendEmail(Session.getActiveUser().getEmail(), `[Bot] ${subject}`, body);
+  } catch (e) {
+    console.warn("Falha ao enviar email de log: " + e.message);
+  }
+}
