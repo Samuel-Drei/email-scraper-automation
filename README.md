@@ -25,5 +25,7 @@ Beyond time savings, the automation eliminates human error, prioritizes higher-q
 
 ## How to run
 1. Import the workflow JSON into n8n
-2. Configure credentials
-3. Run the workflow
+2. Set the Appscripts automation on sheets (change the draft's name in the code)
+3. Configure credentials
+4. Run the workflow
+5. Run the Sheets Automation
