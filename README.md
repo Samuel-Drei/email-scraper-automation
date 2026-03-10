@@ -16,7 +16,7 @@ The pipeline has two main parts:
 
 ### Part 1 — Email Scraping (n8n Workflow)
 
-A [Map Scraper](https://www.stevesie.com/apps/google-maps-scraper) browser extension is used to export business website URLs from Google Maps into a spreadsheet. From there, the n8n automation workflow takes over:
+A [Map Scraper]([https://www.stevesie.com/apps/google-maps-scraper](https://chromewebstore.google.com/detail/maps-scraper-business-lea/ofbhiclojhjkggpnapcnjjjdjlgcikdf?hl=pt-BR&utm_source=ext_sidebar)) browser extension is used to export business website URLs from Google Maps into a spreadsheet. From there, the n8n automation workflow takes over:
 
 1. **Loop Over Items** — iterates over each domain in the spreadsheet one by one
 2. **Normalização (Normalization)** — a Python script that cleans the raw domain string, stripping `https://`, `http://`, `www.` prefixes and trailing paths, producing a clean base domain (e.g. `example.com.br`)
