@@ -1,6 +1,6 @@
 # 📧 Email Scraper Automation
 
-#### Video Demo: [TODO: Add URL]
+#### Video Demo: https://youtu.be/PCBBV0heSv8
 
 ## Description
 
