@@ -1,4 +1,4 @@
-# 📧 Email Scraper Automation
+#  Email Scraper Automation
 
 #### Video Demo: https://youtu.be/PCBBV0heSv8
 
