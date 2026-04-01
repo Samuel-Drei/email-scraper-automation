@@ -9,6 +9,7 @@
 The project was built to solve a real problem at **Ibrand Agency**: reaching out to real estate businesses whose contact emails are buried inside their websites or domain registration records. Instead of spending hours doing this manually, this system automates the entire process from domain → email → outreach.
 
 ---
+![Email-scrapper-workflow](./EMAIL SCRAPPER workflow.png)
 
 ## How It Works
 
