@@ -41,7 +41,7 @@ function startAutomation() {
     });
 
     // Executa o primeiro lote
-    runAutomation_();
+    _runAutomation();
     SpreadsheetApp.getUi().alert('Automação iniciada com sucesso.');
   } catch (err) {
     SpreadsheetApp.getUi().alert('Erro ao iniciar: ' + err.message);
@@ -78,7 +78,7 @@ function showStatus() {
 }
 
 /** ===================== CORE AUTOMATION ===================== **/
-function runAutomation_() {
+function _runAutomation() {
   const lock = LockService.getScriptLock();
   // Tenta bloquear por 30s para evitar execuções simultâneas
   if (!lock.tryLock(30000)) return;
@@ -105,7 +105,7 @@ function runAutomation_() {
     if (result.hasMore) {
       // Se ainda tem gente na lista (hasMore = true), agenda o próximo
       const nextRun = new Date(Date.now() + (Number(props.getProperty('INTERVAL_MINUTES')) * 60 * 1000));
-      scheduleTrigger_('runAutomation_', nextRun);
+      scheduleTrigger_('_runAutomation', nextRun);
       props.setProperty('NEXT_RUN', nextRun.toISOString());
 
       logEmail_(`Relatório de Lote (${result.sentCount} enviados)`, 
