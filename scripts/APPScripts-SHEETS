@@ -130,7 +130,7 @@ function _runAutomation() {
  * Retorna { sentCount: number, hasMore: boolean }
  */
 function processBatch_(batchLimit) {
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = SpreadsheetApp.getActiveSheet().getSheetByName('Sheet1');
   // Pega todos os dados como String para preservar formatação
   const range = sheet.getDataRange();
   const data = range.getDisplayValues();
