@@ -105,22 +105,22 @@ function _runAutomation() {
     if (result.hasMore) {
       // Se ainda tem gente na lista (hasMore = true), agenda o próximo
       const nextRun = new Date(Date.now() + (Number(props.getProperty('INTERVAL_MINUTES')) * 60 * 1000));
-      scheduleTrigger_('_runAutomation', nextRun);
+      _scheduleTrigger('_runAutomation', nextRun);
       props.setProperty('NEXT_RUN', nextRun.toISOString());
 
-      logEmail_(`Relatório de Lote (${result.sentCount} enviados)`, 
+      _logEmail(`Relatório de Lote (${result.sentCount} enviados)`, 
         `Lote finalizado.\nEnviados agora: ${result.sentCount}\nTotal acumulado: ${newTotal}\nPróximo envio: ${nextRun}`);
     } else {
       // Se acabou a lista
       stopAutomation(true); 
       props.deleteProperty('NEXT_RUN');
-      logEmail_('Automação Finalizada', `Todos os e-mails da planilha foram processados.\nTotal enviado: ${newTotal}`);
+      _logEmail('Automação Finalizada', `Todos os e-mails da planilha foram processados.\nTotal enviado: ${newTotal}`);
     }
 
   } catch (error) {
     console.error(error);
     stopAutomation(true); // Pausa em caso de erro crítico
-    logEmail_('ERRO CRÍTICO - Automação Pausada', `Erro: ${error.message}\nStack: ${error.stack}`);
+    _logEmail('ERRO CRÍTICO - Automação Pausada', `Erro: ${error.message}\nStack: ${error.stack}`);
   } finally {
     lock.releaseLock();
   }
@@ -227,8 +227,6 @@ function processBatch_(batchLimit) {
     if (sentInThisBatch >= batchLimit) {
       // Verificamos se ainda sobraram e-mails nessa mesma linha ou nas próximas
       if (pending.length > emailsSentForThisRow.length) hasMoreRecipients = true;
-      // Precisamos checar se existem linhas ABAIXO desta que ainda têm pendências
-      else if (checkIfMoreRowsExist_(data, r + 1, recipientIdx, statusIdx)) hasMoreRecipients = true;
       
       break; 
     }
@@ -240,16 +238,6 @@ function processBatch_(batchLimit) {
   }
 
   return { sentCount: sentInThisBatch, hasMore: hasMoreRecipients };
-}
-
-// Helper rápido para ver se tem mais gente nas linhas de baixo (otimização)
-function checkIfMoreRowsExist_(rows, startIndex, recIdx, statIdx) {
-  for (let i = startIndex; i < rows.length; i++) {
-    const raw = rows[i][recIdx];
-    const stat = rows[i][statIdx];
-    if (raw && (!stat || stat.length < raw.length)) return true; // Lógica simplificada
-  }
-  return false;
 }
 
 /** ===================== TEMPLATE ENGINE ===================== **/
@@ -312,12 +300,12 @@ function fillTemplate_(templateObj, rowData, headers) {
 }
 
 /** ===================== UTILIDADES ===================== **/
-function scheduleTrigger_(funcName, dateObj) {
+function _scheduleTrigger(funcName, dateObj) {
   ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger(funcName).timeBased().at(dateObj).create();
 }
 
-function logEmail_(subject, body) {
+function _logEmail(subject, body) {
   try {
     GmailApp.sendEmail(Session.getActiveUser().getEmail(), `[Bot] ${subject}`, body);
   } catch (e) {
