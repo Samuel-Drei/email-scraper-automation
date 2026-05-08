@@ -6,7 +6,7 @@
 /** ===================== CONFIG ===================== **/
 const RECIPIENT_COL    = "Email";
 const EMAIL_SENT_COL   = "Email Sent";
-const DRAFT_SUBJECT    = "Por que alguns anúncios imobiliários performam mais";
+const DRAFT_SUBJECT    = "Quem aparece primeiro no Google leva o cliente";
 
 // Configurações de Lote
 const BATCH_SIZE       = 95;   // Limite exato de envios por execução
@@ -163,12 +163,19 @@ function processBatch_(batchLimit) {
                              .map(e => e.trim())
                              .filter(e => e !== '' && e.includes('@'));
 
-    // 2. Verifica quais já foram enviados olhando a coluna de Status
-    // A coluna status agora vai armazenar: "email1@teste.com (Data), email2@teste.com (Data)"
-    const alreadySentList = currentStatus ? currentStatus.toLowerCase() : "";
     
     // Filtra apenas os pendentes
-    const pending = targets.filter(email => !alreadySentList.includes(email.toLowerCase()));
+    const sentEmails = currentStatus
+      ? currentStatus
+      .split('\n')
+      .map(l => l.match(/^([^\s]+)/))
+      .filter(Boolean)
+      .map(m => m[1].toLowerCase())
+      : [];
+
+    const pending = targets.filter(email =>
+      !sentEmails.includes(email.toLowerCase())
+);
 
     if (pending.length === 0) {
       continue; // Linha totalmente processada
@@ -230,6 +237,7 @@ function processBatch_(batchLimit) {
       
       break; 
     }
+    
   }
 
   // Verificação final se não bateu o limite mas acabou o loop (para garantir que hasMore esteja certo)
@@ -237,7 +245,46 @@ function processBatch_(batchLimit) {
     // Se processou tudo e não bateu o limite, hasMore continua false, a menos que tenha sido setado antes
   }
 
-  return { sentCount: sentInThisBatch, hasMore: hasMoreRecipients };
+  if (sentInThisBatch < batchLimit) {
+
+  // Verifica se ainda existem emails pendentes
+  outerLoop:
+  for (let r = 0; r < data.length; r++) {
+
+    const row = data[r];
+    const rawEmails = row[recipientIdx];
+    const currentStatus = row[statusIdx];
+
+    if (!rawEmails) continue;
+
+    const targets = rawEmails
+      .split(/[\n\r,;]+/)
+      .map(e => e.trim())
+      .filter(e => e !== '' && e.includes('@'));
+
+    const sentEmails = currentStatus
+      ? currentStatus
+          .split('\n')
+          .map(l => l.match(/^([^\s]+)/))
+          .filter(Boolean)
+          .map(m => m[1].toLowerCase())
+      : [];
+
+    const pending = targets.filter(email =>
+      !sentEmails.includes(email.toLowerCase())
+    );
+
+    if (pending.length > 0) {
+      hasMoreRecipients = true;
+      break outerLoop;
+      }
+    }
+  }
+
+return {
+  sentCount: sentInThisBatch, 
+  hasMore: hasMoreRecipients };
+
 }
 
 /** ===================== TEMPLATE ENGINE ===================== **/
@@ -267,7 +314,7 @@ function getGmailTemplate_(subject) {
       if (img) inlineImages[cid] = img;
     }
   }
-
+  
   return { 
     message: { subject: subject, text: msg.getPlainBody(), html: body }, 
     attachments: attachments, 
