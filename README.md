@@ -6,6 +6,9 @@
 
 **Email Scraper Automation** is a full pipeline that automatically collects business emails from websites found on Google Maps and sends personalized cold emails at scale — without any manual copy-pasting.
 
+<img width="1217" height="737" alt="image" src="https://github.com/user-attachments/assets/50b25cfe-9aa5-4749-b54a-2f37dcbff886" />
+
+
 The project was built to solve a real problem at **Ibrand Agency**: reaching out to real estate businesses whose contact emails are buried inside their websites or domain registration records. Instead of spending hours doing this manually, this system automates the entire process from domain → email → outreach.
 
 ---
